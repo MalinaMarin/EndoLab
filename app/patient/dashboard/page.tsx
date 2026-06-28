@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Check, ClipboardList, CreditCard, FileSearch2, Stethoscope, UploadCloud } from "lucide-react";
+import { Archive, ArrowRight, Check, ClipboardList, CreditCard, FileSearch2, Stethoscope, UploadCloud } from "lucide-react";
 import CompactSummaryCard from "@/components/clinical/compact-summary-card";
 import { Button } from "@/components/ui/button";
 import { requirePatient } from "@/lib/account";
@@ -10,6 +10,9 @@ export const dynamic = "force-dynamic";
 export default async function PatientDashboardPage() {
   const context = await requirePatient();
   const cases = await listCases(context);
+  const activeCases = cases.filter((item) => !item.archivedAt);
+  const archivedCases = cases.filter((item) => item.archivedAt);
+  const activeCase = activeCases[0];
 
   return (
     <main className="min-h-screen bg-slate-50/70">
@@ -21,15 +24,17 @@ export default async function PatientDashboardPage() {
             <p className="mt-2 text-slate-600">Your cases, payment state, record gaps, and specialist referrals stay in one account.</p>
           </div>
           <Button asChild size="lg">
-            <Link href="/intake"><ClipboardList className="h-4 w-4" /> Start a new case</Link>
+            <Link href={activeCase ? `/doctor/case/${activeCase.id}` : "/intake"}>
+              <ClipboardList className="h-4 w-4" /> {activeCase ? "Update active case" : "Start my case"}
+            </Link>
           </Button>
         </header>
 
         {cases.length ? (
           <div className="mt-7 grid gap-4 sm:grid-cols-3">
-            <Metric icon={FileSearch2} label="Cases" value={cases.length} />
+            <Metric icon={FileSearch2} label="Active case" value={activeCases.length} />
             <Metric icon={CreditCard} label="Paid cases" value={cases.filter((item) => item.paymentStatus === "paid").length} />
-            <Metric icon={ClipboardList} label="Record gaps" value={cases.reduce((sum, item) => sum + item.missingInfo.length, 0)} />
+            <Metric icon={Archive} label="Archived journeys" value={archivedCases.length} />
           </div>
         ) : (
           <section className="mt-8 overflow-hidden rounded-lg border border-violet-200 bg-white shadow-[0_18px_44px_-34px_rgba(76,29,149,0.55)]">
@@ -55,21 +60,39 @@ export default async function PatientDashboardPage() {
 
         <section className="mt-8">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-slate-950">My cases</h2>
+            <div>
+              <h2 className="text-xl font-semibold text-slate-950">Active clinical journey</h2>
+              <p className="mt-1 text-sm text-slate-600">This is the single current packet visible for specialist review.</p>
+            </div>
             <Link href="/patient/specialists" className="inline-flex items-center gap-1 text-sm font-semibold text-teal-700">
               Browse specialists <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
-          {cases.length ? (
+          {activeCases.length ? (
             <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {cases.map((item) => <CompactSummaryCard key={item.id} item={item} />)}
+              {activeCases.map((item) => <CompactSummaryCard key={item.id} item={item} />)}
             </div>
           ) : (
             <div className="mt-4 rounded-lg border border-violet-100 bg-violet-50/50 p-5 text-sm text-violet-900">
-              Your finished packet will contain a clinical summary, disease map, record-gap checklist, referral readiness, and specialist-fit guidance.
+              You have no active case. Start a new journey or restore one from your archive.
             </div>
           )}
         </section>
+
+        {archivedCases.length ? (
+          <section className="mt-10 border-t border-slate-200 pt-8">
+            <div className="flex items-center gap-2">
+              <Archive className="h-5 w-5 text-slate-500" />
+              <div>
+                <h2 className="text-xl font-semibold text-slate-950">Archived journeys</h2>
+                <p className="mt-1 text-sm text-slate-600">Historical cases remain private and can be restored when no other case is active.</p>
+              </div>
+            </div>
+            <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {archivedCases.map((item) => <CompactSummaryCard key={item.id} item={item} />)}
+            </div>
+          </section>
+        ) : null}
       </section>
     </main>
   );

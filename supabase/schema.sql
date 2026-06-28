@@ -102,6 +102,49 @@ create unique index if not exists referrals_active_case_specialist_idx
 on public.referrals(case_id, specialist_id)
 where status in ('pending', 'accepted');
 
+create table if not exists public.case_messages (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  case_id uuid not null references public.cases(id) on delete cascade,
+  sender_user_id uuid references auth.users(id),
+  sender_name text not null default '',
+  sender_role text not null default 'patient',
+  body text not null,
+  message_type text not null default 'message' check (message_type in ('message', 'missing_record_request', 'specialist_question', 'status_update')),
+  attachments jsonb not null default '[]'::jsonb,
+  read_by jsonb not null default '[]'::jsonb,
+  organization_id uuid references public.organizations(id)
+);
+
+create index if not exists case_messages_case_created_idx on public.case_messages(case_id, created_at desc);
+create index if not exists case_messages_organization_idx on public.case_messages(organization_id);
+
+create table if not exists public.case_documents (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  case_id uuid not null references public.cases(id) on delete cascade,
+  path text not null,
+  name text not null,
+  content_type text,
+  size_bytes bigint,
+  kind text not null default 'other' check (kind in ('pdf', 'image', 'dicom', 'other')),
+  extraction_status text not null default 'pending' check (extraction_status in ('pending', 'extracted', 'needs_ocr', 'ocr_queued', 'ocr_complete', 'unsupported', 'failed')),
+  ocr_status text not null default 'not_required' check (ocr_status in ('not_required', 'queued', 'complete', 'failed')),
+  extracted_text text,
+  ocr_text text,
+  ocr_confidence int check (ocr_confidence is null or (ocr_confidence >= 0 and ocr_confidence <= 100)),
+  ocr_provider text,
+  ocr_completed_at timestamptz,
+  metadata jsonb not null default '{}'::jsonb,
+  organization_id uuid references public.organizations(id),
+  created_by uuid references auth.users(id)
+);
+
+create unique index if not exists case_documents_path_idx on public.case_documents(path);
+create index if not exists case_documents_case_created_idx on public.case_documents(case_id, created_at desc);
+create index if not exists case_documents_organization_idx on public.case_documents(organization_id);
+
 create table if not exists public.reviews (
   id uuid primary key default gen_random_uuid(),
   created_at timestamptz not null default now(),
@@ -220,6 +263,10 @@ alter table public.cases add column if not exists organization_id uuid reference
 alter table public.cases add column if not exists assigned_to text;
 alter table public.referrals add column if not exists requested_by_user_id uuid references auth.users(id);
 alter table public.referrals add column if not exists organization_id uuid references public.organizations(id);
+alter table public.case_messages add column if not exists organization_id uuid references public.organizations(id);
+alter table public.case_documents add column if not exists updated_at timestamptz not null default now();
+alter table public.case_documents add column if not exists organization_id uuid references public.organizations(id);
+alter table public.case_documents add column if not exists created_by uuid references auth.users(id);
 alter table public.reviews add column if not exists organization_id uuid references public.organizations(id);
 alter table public.import_audits add column if not exists organization_id uuid references public.organizations(id);
 
@@ -227,6 +274,8 @@ update public.cases set payment_status = 'not_required' where status = 'imported
 
 alter table public.cases enable row level security;
 alter table public.referrals enable row level security;
+alter table public.case_messages enable row level security;
+alter table public.case_documents enable row level security;
 alter table public.reviews enable row level security;
 alter table public.export_jobs enable row level security;
 alter table public.import_audits enable row level security;
@@ -319,6 +368,38 @@ for all using (
   )
 );
 
+drop policy if exists "case_messages_access_by_case" on public.case_messages;
+create policy "case_messages_access_by_case" on public.case_messages
+for all using (
+  exists (
+    select 1 from public.cases c
+    where c.id = case_messages.case_id
+      and (c.owner_user_id = auth.uid() or public.is_org_member(c.organization_id))
+  )
+) with check (
+  exists (
+    select 1 from public.cases c
+    where c.id = case_messages.case_id
+      and (c.owner_user_id = auth.uid() or public.is_org_member(c.organization_id))
+  )
+);
+
+drop policy if exists "case_documents_access_by_case" on public.case_documents;
+create policy "case_documents_access_by_case" on public.case_documents
+for all using (
+  exists (
+    select 1 from public.cases c
+    where c.id = case_documents.case_id
+      and (c.owner_user_id = auth.uid() or public.is_org_member(c.organization_id))
+  )
+) with check (
+  exists (
+    select 1 from public.cases c
+    where c.id = case_documents.case_id
+      and (c.owner_user_id = auth.uid() or public.is_org_member(c.organization_id))
+  )
+);
+
 drop policy if exists "reviews_access_by_case" on public.reviews;
 create policy "reviews_access_by_case" on public.reviews
 for select using (
@@ -350,6 +431,8 @@ grant select, insert, update, delete on table
   public.organization_invitations,
   public.cases,
   public.referrals,
+  public.case_messages,
+  public.case_documents,
   public.reviews,
   public.import_audits,
   public.import_draft_rows,
@@ -364,6 +447,8 @@ grant all privileges on table
   public.organization_invitations,
   public.cases,
   public.referrals,
+  public.case_messages,
+  public.case_documents,
   public.reviews,
   public.export_jobs,
   public.import_audits,

@@ -32,6 +32,8 @@ STRIPE_WEBHOOK_SECRET
 NEXT_PUBLIC_URL
 ```
 
+For local presentations without Stripe, set `ENABLE_SANDBOX_CHECKOUT=true`. This marks a patient case as paid after the checkout button is pressed so the referral journey can be demonstrated end to end. Do not enable it in a real clinic workspace.
+
 Required for reviewer administration:
 
 ```text

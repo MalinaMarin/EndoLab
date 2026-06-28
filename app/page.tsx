@@ -35,6 +35,14 @@ export default function HomePage() {
               action="Open patient journey"
             />
           </div>
+          <div className="mt-5">
+            <Button asChild variant="outline" size="lg" className="bg-white/80">
+              <Link href="/demo">
+                Start demo walkthrough
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
 
           <div className="mt-8 grid max-w-3xl gap-3 sm:grid-cols-3">
             <ProofPoint label="82%" value="referral readiness" />

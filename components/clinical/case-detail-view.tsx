@@ -18,11 +18,15 @@ import {
   getReviewPriority,
   matchSpecialists,
 } from "@/lib/case-utils";
-import { AlertTriangle, CalendarFold, ClipboardCheck, FileText, GraduationCap, ListChecks, Map, ScissorsLineDashed, ShieldCheck, Stethoscope } from "lucide-react";
+import { AlertTriangle, CalendarFold, CheckCircle2, CircleDashed, ClipboardCheck, Clock3, FileText, GraduationCap, ListChecks, Map, ScissorsLineDashed, ShieldCheck, Stethoscope } from "lucide-react";
 import CaseDetailEditor from "@/components/clinical/case-detail-editor";
 import { ExportPdfButton } from "@/components/clinical/export-pdf-button";
 import { ReferralRequestButton } from "@/components/clinical/referral-request-button";
 import { ShareCaseButton } from "@/components/clinical/share-case-button";
+import { CheckoutButton } from "@/components/clinical/checkout-button";
+import { CaseIntelligencePanel } from "@/components/clinical/case-intelligence-panel";
+import { CaseDocumentWorkspace } from "@/components/clinical/case-document-workspace";
+import { CaseMessagingPanel } from "@/components/clinical/case-messaging-panel";
 import { getSpecialistById } from "@/lib/specialists";
 import { buildMissingRecordTasks, getCaseWorkflowStatus, getWorkflowStatusLabel } from "@/lib/workflow";
 
@@ -51,10 +55,12 @@ function Section({
 export function CaseDetailView({
   item,
   referrals,
+  canManageLifecycle = false,
   isDemoCase = false,
 }: {
   item: EndoCase;
   referrals: ReferralRequest[];
+  canManageLifecycle?: boolean;
   isDemoCase?: boolean;
 }) {
   const [diseaseMapState, setDiseaseMapState] = useState<EndoCase["diseaseMap"]>(item.diseaseMap);
@@ -120,13 +126,18 @@ export function CaseDetailView({
             </p>
           ) : null}
           {!isDemoCase && item.status !== "imported" && item.paymentStatus !== "paid" ? (
-            <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-              Payment is required before a specialist referral can be sent. Return to intake to complete checkout.
-            </p>
+            <div className="mt-3 flex flex-col gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between">
+              <p>Service confirmation is required before a specialist referral can be sent.</p>
+              <CheckoutButton caseId={item.id} label="Confirm service" />
+            </div>
           ) : null}
       </div>
 
-      <CaseDetailEditor item={item} onChangeDiseaseMap={(next) => setDiseaseMapState(next)} onChangeSurgeries={(next) => setSurgeriesState(next)} />
+      <CaseDetailEditor item={item} canManageLifecycle={canManageLifecycle} onChangeDiseaseMap={(next) => setDiseaseMapState(next)} onChangeSurgeries={(next) => setSurgeriesState(next)} />
+
+      <CaseIntelligencePanel item={displayedItem} />
+      <CaseDocumentWorkspace caseId={item.id} />
+      <CaseMessagingPanel caseId={item.id} />
 
       <div className="grid items-start gap-6 lg:grid-cols-2">
         <Section title="Clinical Summary" icon={Stethoscope}>
@@ -245,9 +256,7 @@ export function CaseDetailView({
                       Create a referral-ready case
                     </Link>
                   ) : item.status !== "imported" && item.paymentStatus !== "paid" ? (
-                    <Link href="/intake" className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-teal-700 hover:bg-teal-50">
-                      Complete checkout first
-                    </Link>
+                    <CheckoutButton caseId={item.id} label="Confirm service first" />
                   ) : (
                     <ReferralRequestButton
                       caseId={item.id}
@@ -266,9 +275,9 @@ export function CaseDetailView({
 
         <Section title="Referral History" icon={ClipboardCheck}>
           {referrals.length === 0 ? (
-            <p className="text-base text-violet-900/80">No referral requests have been recorded yet.</p>
+            <ReferralStatusTracker item={displayedItem} />
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {referrals.map((referral) => {
                 const specialist = getSpecialistById(referral.specialistId);
                 return (
@@ -299,6 +308,9 @@ export function CaseDetailView({
                         day: "numeric",
                       })}
                     </p>
+                    <div className="mt-4">
+                      <ReferralStatusTracker item={displayedItem} status={referral.status} specialistName={specialist?.name ?? referral.specialistId} />
+                    </div>
                   </div>
                 );
               })}
@@ -366,5 +378,77 @@ function CardBadge({ label, value }: { label: string; value: string }) {
       <p className="text-xs uppercase tracking-[0.16em] text-slate-500">{label}</p>
       <p className="mt-2 text-base font-semibold text-slate-950">{value}</p>
     </div>
+  );
+}
+
+function ReferralStatusTracker({
+  item,
+  status,
+  specialistName,
+}: {
+  item: EndoCase;
+  status?: ReferralRequest["status"];
+  specialistName?: string;
+}) {
+  const paidOrClinic = item.status === "imported" || item.paymentStatus === "paid" || item.paymentStatus === "not_required";
+  const requested = Boolean(status);
+  const accepted = status === "accepted";
+  const declined = status === "declined";
+  const steps = [
+    {
+      label: "Case packet prepared",
+      detail: "Clinical summary, disease map, record gaps, and referral guidance are available.",
+      state: "done" as const,
+    },
+    {
+      label: item.status === "imported" ? "Clinic case eligible" : "Service confirmed",
+      detail: paidOrClinic ? "This case can be sent for specialist review." : "Complete checkout before requesting a paid specialist review.",
+      state: paidOrClinic ? "done" as const : "current" as const,
+    },
+    {
+      label: "Referral requested",
+      detail: requested
+        ? `Request sent${specialistName ? ` to ${specialistName}` : ""}.`
+        : "Choose a suggested specialist to send the case packet.",
+      state: requested ? "done" as const : paidOrClinic ? "current" as const : "waiting" as const,
+    },
+    {
+      label: accepted ? "Specialist accepted" : declined ? "Specialist declined" : "Specialist review",
+      detail: accepted
+        ? "The next step is scheduling or final opinion preparation."
+        : declined
+          ? "Request another specialist or adjust the case packet before resubmitting."
+          : requested
+            ? "Awaiting specialist response and follow-up questions."
+            : "Specialist review begins after a referral is requested.",
+      state: accepted || declined ? "done" as const : requested ? "current" as const : "waiting" as const,
+    },
+    {
+      label: "Opinion delivered",
+      detail: "Final signed opinion and shareable packet will be stored with the case.",
+      state: accepted ? "current" as const : "waiting" as const,
+    },
+  ];
+
+  return (
+    <ol className="space-y-3">
+      {steps.map((step) => (
+        <li key={step.label} className="flex gap-3">
+          <span className={`mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border ${
+            step.state === "done"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+              : step.state === "current"
+                ? "border-violet-200 bg-violet-50 text-violet-700"
+                : "border-slate-200 bg-white text-slate-400"
+          }`}>
+            {step.state === "done" ? <CheckCircle2 className="h-3.5 w-3.5" /> : step.state === "current" ? <Clock3 className="h-3.5 w-3.5" /> : <CircleDashed className="h-3.5 w-3.5" />}
+          </span>
+          <span>
+            <span className="block text-sm font-semibold text-slate-950">{step.label}</span>
+            <span className="mt-1 block text-sm leading-5 text-slate-600">{step.detail}</span>
+          </span>
+        </li>
+      ))}
+    </ol>
   );
 }

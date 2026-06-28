@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { BadgeEuro, Building2, ClipboardList, FileSearch2, LayoutDashboard, LogIn, Sparkles, Stethoscope, UserRound, UsersRound } from "lucide-react";
+import { BadgeEuro, BarChart3, Building2, ClipboardList, FileSearch2, LayoutDashboard, LogIn, Sparkles, Stethoscope, UserRound, UsersRound } from "lucide-react";
 import { getUserContext } from "@/lib/account";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { MobileNavigation } from "@/components/layout/mobile-navigation";
 
 const publicNav = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
+  { href: "/demo", label: "Demo", icon: Sparkles },
   { href: "/patient", label: "Patient journey", icon: UsersRound },
   { href: "/patient/specialists", label: "Find specialists", icon: Stethoscope },
   { href: "/pricing", label: "Pricing", icon: BadgeEuro },
@@ -19,6 +20,7 @@ export async function BrandBar() {
         { href: "/", label: "Overview", icon: LayoutDashboard },
         { href: "/clinic/dashboard", label: "Clinic", icon: Building2 },
         { href: "/clinic/import", label: "Import", icon: ClipboardList },
+        { href: "/clinic/analytics", label: "Analytics", icon: BarChart3 },
         { href: "/doctor/inbox", label: "Doctor Inbox", icon: FileSearch2 },
       ]
     : context?.accountType === "patient"

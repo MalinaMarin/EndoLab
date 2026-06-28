@@ -3,8 +3,8 @@ import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 import { createServerClient } from "@supabase/ssr";
 
-const PUBLIC_PATHS = ["/", "/patient", "/patient/specialists", "/pricing", "/privacy", "/terms", "/login", "/signup", "/forgot-password", "/reset-password"];
-const PUBLIC_API_PATHS = ["/api/auth/login", "/api/auth/signup", "/api/auth/forgot-password", "/api/auth/reset-password", "/api/stripe/webhook", "/api/health"];
+const PUBLIC_PATHS = ["/", "/demo", "/patient", "/patient/specialists", "/pricing", "/privacy", "/terms", "/login", "/signup", "/forgot-password", "/reset-password"];
+const PUBLIC_API_PATHS = ["/api/auth/login", "/api/auth/logout", "/api/auth/signup", "/api/auth/forgot-password", "/api/auth/reset-password", "/api/stripe/webhook", "/api/health"];
 
 function isPublicPath(path: string) {
   return PUBLIC_PATHS.includes(path) ||
@@ -13,6 +13,28 @@ function isPublicPath(path: string) {
     path.startsWith("/auth/") ||
     path.startsWith("/_next/") ||
     path === "/favicon.ico";
+}
+
+function isAllowedRequestOrigin(origin: string, request: NextRequest) {
+  if (origin === request.nextUrl.origin) return true;
+
+  const host = request.headers.get("host");
+  if (host && origin === `${request.nextUrl.protocol}//${host}`) return true;
+
+  if (process.env.NODE_ENV !== "production") {
+    try {
+      const originUrl = new URL(origin);
+      const appUrl = new URL(`${request.nextUrl.protocol}//${host ?? request.nextUrl.host}`);
+      const localHosts = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+      return localHosts.has(originUrl.hostname) &&
+        localHosts.has(appUrl.hostname) &&
+        originUrl.port === appUrl.port;
+    } catch {
+      return false;
+    }
+  }
+
+  return false;
 }
 
 async function hasValidToken(token: string | undefined, secret: string) {
@@ -76,7 +98,7 @@ export async function proxy(request: NextRequest) {
 
   if (["POST", "PUT", "PATCH", "DELETE"].includes(request.method) && path.startsWith("/api/") && !PUBLIC_API_PATHS.includes(path)) {
     const origin = request.headers.get("origin");
-    if (origin && origin !== request.nextUrl.origin) {
+    if (origin && !isAllowedRequestOrigin(origin, request)) {
       return NextResponse.json({ error: "Cross-origin request rejected." }, { status: 403 });
     }
   }

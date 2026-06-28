@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { BadgeEuro, Building2, ClipboardList, FileSearch2, LayoutDashboard, LogIn, Menu, Stethoscope, UserRound, UsersRound, X } from "lucide-react";
+import { BadgeEuro, BarChart3, Building2, ClipboardList, FileSearch2, LayoutDashboard, LogIn, Menu, Sparkles, Stethoscope, UserRound, UsersRound, X } from "lucide-react";
 
 type NavItem = { href: string; label: string };
 
 const icons = {
   account: UserRound,
+  analytics: BarChart3,
   clinic: Building2,
   import: ClipboardList,
   inbox: FileSearch2,
@@ -16,10 +17,13 @@ const icons = {
   pricing: BadgeEuro,
   specialists: Stethoscope,
   default: LayoutDashboard,
+  demo: Sparkles,
 };
 
 function iconFor(href: string) {
   if (href.includes("account")) return icons.account;
+  if (href === "/demo") return icons.demo;
+  if (href.includes("analytics")) return icons.analytics;
   if (href.includes("clinic/dashboard")) return icons.clinic;
   if (href.includes("import") || href.includes("intake")) return icons.import;
   if (href.includes("inbox")) return icons.inbox;

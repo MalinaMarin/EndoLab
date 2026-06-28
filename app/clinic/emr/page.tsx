@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { EmrConnectorAlpha } from "@/components/clinical/emr-connector";
+import { EmrConnectorPreview } from "@/components/clinical/emr-connector";
 import { requireClinic } from "@/lib/account";
 
 export default async function ClinicEmrPage() {
@@ -12,10 +12,10 @@ export default async function ClinicEmrPage() {
         <div className="mb-8 border-b border-slate-200 pb-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.16em] text-teal-700">EMR connector alpha</p>
-              <h1 className="mt-2 text-3xl font-semibold text-slate-950 md:text-4xl">Prototype EMR import workflow</h1>
+              <p className="text-sm font-semibold uppercase tracking-[0.16em] text-teal-700">EMR connector preview</p>
+              <h1 className="mt-2 text-3xl font-semibold text-slate-950 md:text-4xl">EMR import workflow</h1>
               <p className="mt-3 max-w-3xl text-base leading-7 text-slate-700">
-                Connect EndoLab to a clinic EMR feed and import structured cases from live patient summaries. This alpha connector demonstrates the first integration layer for EMR-to-referral workflows.
+                Connect EndoLab to a clinic EMR feed and import structured cases from patient summaries. This guided preview shows the first integration layer for EMR-to-referral workflows.
               </p>
             </div>
             <Button asChild variant="outline" size="lg">
@@ -26,7 +26,7 @@ export default async function ClinicEmrPage() {
           </div>
         </div>
 
-        <EmrConnectorAlpha />
+        <EmrConnectorPreview />
       </section>
     </main>
   );

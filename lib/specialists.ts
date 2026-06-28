@@ -1,4 +1,4 @@
-import { EndoCase } from "@/lib/types";
+import type { EndoCase } from "./types.ts";
 
 export type Specialist = {
   id: string;

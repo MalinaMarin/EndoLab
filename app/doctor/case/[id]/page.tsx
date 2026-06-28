@@ -29,6 +29,7 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
         <CaseDetailView
           item={item}
           referrals={referrals}
+          canManageLifecycle={context.accountType === "patient"}
           isDemoCase={process.env.ENABLE_DEMO_DATA === "true" && sampleCases.some((sample) => sample.id === item.id)}
         />
       </section>

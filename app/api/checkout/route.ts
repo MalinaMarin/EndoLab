@@ -10,6 +10,10 @@ function getEnv(name: string) {
   return value;
 }
 
+function sandboxCheckoutEnabled() {
+  return process.env.ENABLE_SANDBOX_CHECKOUT === "true" || process.env.NODE_ENV !== "production";
+}
+
 export async function POST(request: Request) {
   try {
     const limited = enforceRateLimit(request, { key: "checkout", limit: 10, windowMs: 60_000 });
@@ -39,6 +43,24 @@ export async function POST(request: Request) {
     }
     if (caseRecord.payment_status === "paid") {
       return NextResponse.json({ error: "This case is already paid." }, { status: 409 });
+    }
+
+    if (!process.env.STRIPE_SECRET_KEY && sandboxCheckoutEnabled()) {
+      await supabase
+        .from("cases")
+        .update({
+          payment_status: "paid",
+          stripe_session_id: `sandbox_${caseId}`,
+          paid_at: new Date().toISOString(),
+        })
+        .eq("id", caseId);
+
+      const appUrl = process.env.NEXT_PUBLIC_URL ?? "http://localhost:3000";
+      return NextResponse.json({
+        url: `${appUrl}/doctor/case/${caseId}?paid=true&sandboxCheckout=true`,
+        sandbox: true,
+        message: "Sandbox checkout completed because Stripe is not configured.",
+      });
     }
 
     const stripe = new Stripe(getEnv("STRIPE_SECRET_KEY"));

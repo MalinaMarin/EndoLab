@@ -73,6 +73,7 @@ function rowToCase(row: CaseRow): EndoCase {
     organizationId: row.organization_id ?? undefined,
     assignedTo: row.assigned_to ?? undefined,
     createdAt: row.created_at ?? undefined,
+    archivedAt: row.status === "archived" ? row.created_at ?? new Date(0).toISOString() : undefined,
   };
 }
 
@@ -83,7 +84,7 @@ export async function listCases(context?: UserContext): Promise<EndoCase[]> {
     const supabase = createSupabaseServerClient();
     const baseQuery = supabase.from("cases").select("*");
     const query = activeContext.accountType === "clinic"
-      ? baseQuery.eq("organization_id", activeContext.organizationId!)
+      ? baseQuery.eq("organization_id", activeContext.organizationId!).neq("status", "archived")
       : baseQuery.eq("owner_user_id", activeContext.user.id);
     const { data, error } = await withTimeout(
       query.order("created_at", { ascending: false }),
@@ -113,7 +114,7 @@ export async function getCase(id: string, context?: UserContext): Promise<EndoCa
     const supabase = createSupabaseServerClient();
     const baseQuery = supabase.from("cases").select("*").eq("id", id);
     const query = activeContext.accountType === "clinic"
-      ? baseQuery.eq("organization_id", activeContext.organizationId!)
+      ? baseQuery.eq("organization_id", activeContext.organizationId!).neq("status", "archived")
       : baseQuery.eq("owner_user_id", activeContext.user.id);
     const { data, error } = await withTimeout(query.maybeSingle());
 

@@ -1,5 +1,5 @@
-import { EndoCase } from "@/lib/types";
-export { matchSpecialists } from "@/lib/specialists";
+import type { EndoCase } from "./types.ts";
+export { matchSpecialists } from "./specialists.ts";
 
 function locationLabel(value: string) {
   return value.replace("_", " ");

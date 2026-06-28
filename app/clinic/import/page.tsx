@@ -39,13 +39,13 @@ export default async function ClinicImportPage() {
         <div className="mb-8 rounded-lg border border-teal-200 bg-teal-50/80 p-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-2xl font-semibold text-slate-950">EMR connector alpha</h2>
+              <h2 className="text-2xl font-semibold text-slate-950">Guided EMR connector preview</h2>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-700">
-                If your clinic uses an EMR system, this alpha connector simulates direct EMR integration so EndoLab can import structured patient summaries without first exporting CSV files.
+                If your clinic uses an EMR system, this preview shows how EndoLab can import structured patient summaries without first exporting CSV files.
               </p>
             </div>
             <Button asChild variant="secondary" size="lg">
-              <Link href="/clinic/emr">Try EMR alpha</Link>
+              <Link href="/clinic/emr">Open EMR preview</Link>
             </Button>
           </div>
         </div>

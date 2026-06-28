@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { extractCaseInfo } from "@/lib/document-extraction";
+import { extractCaseIntelligence } from "@/lib/document-extraction";
 import { enforceRateLimit } from "@/lib/request-safety";
 
 export async function POST(request: Request) {
@@ -16,8 +16,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Report text is too long." }, { status: 413 });
     }
 
-    const extracted = extractCaseInfo(text);
-    return NextResponse.json({ success: true, extracted });
+    const intelligence = extractCaseIntelligence(text);
+    return NextResponse.json({ success: true, ...intelligence });
   } catch (error) {
     return NextResponse.json(
       {

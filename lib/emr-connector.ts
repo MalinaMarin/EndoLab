@@ -31,7 +31,7 @@ export const demoEmrRecords: EmrRecord[] = [
     clinicalNote:
       "Patient reports worsening dysmenorrhea and dyspareunia. MRI demonstrates a 3.4cm right ovarian cyst consistent with endometrioma and thickened uterosacral ligaments. No bowel nodularity was identified. Recommend referral to specialist for surgical evaluation.",
     lastUpdated: "2026-05-22T14:20:00Z",
-    sourceSystem: "Demo EMR Alpha",
+    sourceSystem: "Sample EMR Feed",
   },
   {
     id: "emr-record-2",
@@ -46,7 +46,7 @@ export const demoEmrRecords: EmrRecord[] = [
     clinicalNote:
       "Patient has persistent pelvic pain despite a 6-month course of combined oral contraception and NSAIDs. Ultrasound findings are suggestive of bilateral endometriotic cysts. She requests referral for specialist surgical consultation and further treatment planning.",
     lastUpdated: "2026-05-29T09:05:00Z",
-    sourceSystem: "Demo EMR Alpha",
+    sourceSystem: "Sample EMR Feed",
   },
 ];
 
@@ -85,7 +85,7 @@ export function buildCasePayloadFromEmr(record: EmrRecord) {
     uncertaintyFlags,
     missingInfo,
     severity: getEmrRecordSeverity(record),
-    complexityNote: "Imported from EMR connector alpha.",
+    complexityNote: "Imported from EMR connector preview.",
     sourceLabel: record.sourceSystem,
   });
 }

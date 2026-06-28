@@ -4,6 +4,9 @@ import { EndoCase } from "@/lib/types";
 import { buildCaseInsertPayload } from "@/lib/case-creation";
 import { cleanText, enforceRateLimit, isAllowedClinicalFile } from "@/lib/request-safety";
 import { getUserContext } from "@/lib/account";
+import { classifyUploadedDocument } from "@/lib/document-files";
+import { extractCaseInfo } from "@/lib/document-extraction";
+import { buildCaseDocumentRecord, isMissingDocumentTableError, type CaseDocumentRecord } from "@/lib/case-documents";
 
 function splitLines(value: string) {
   return value
@@ -82,6 +85,10 @@ async function parseRequest(request: Request) {
   };
 }
 
+function uniqueValues(values: string[]) {
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
+}
+
 export async function POST(request: Request) {
   try {
     const limited = enforceRateLimit(request, { key: "case-create", limit: 12, windowMs: 60_000 });
@@ -96,6 +103,27 @@ export async function POST(request: Request) {
     const context = await getUserContext();
     if (!context) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
     const payload = await parseRequest(request);
+
+    if (context.accountType === "patient") {
+      const { data: activeCase, error: activeCaseError } = await supabase
+        .from("cases")
+        .select("id")
+        .eq("owner_user_id", context.user.id)
+        .neq("status", "archived")
+        .limit(1)
+        .maybeSingle();
+      if (activeCaseError) {
+        return NextResponse.json({ error: "Could not verify your active case.", details: activeCaseError.message }, { status: 500 });
+      }
+      if (activeCase) {
+        return NextResponse.json({
+          error: "You already have an active case.",
+          code: "ACTIVE_CASE_EXISTS",
+          caseId: activeCase.id,
+          guidance: "Update or archive the active case before starting a new clinical journey.",
+        }, { status: 409 });
+      }
+    }
 
     if (!payload.title || payload.symptoms.length === 0) {
       return NextResponse.json({ error: "Title and symptoms are required." }, { status: 400 });
@@ -116,6 +144,14 @@ export async function POST(request: Request) {
     const severity = deriveSeverity(payload.symptoms);
     const id = crypto.randomUUID();
     const uploadedEntries: string[] = [];
+    const documentRows: CaseDocumentRecord[] = [];
+    const extractedReportTexts: string[] = [];
+    let extractedSymptoms = payload.symptoms;
+    let extractedImaging = payload.imaging;
+    let extractedSurgeries = payload.surgeries;
+    let extractedUncertaintyFlags = payload.uncertaintyFlags;
+    let extractedMissingInfo = payload.missingInfo;
+    let extractedDiseaseMap = payload.diseaseMap;
 
     if (Array.isArray(payload.documents)) {
       const files = payload.documents.filter((value): value is File => value instanceof File && value.size > 0);
@@ -129,6 +165,7 @@ export async function POST(request: Request) {
         const safeName = value.name.replace(/[^a-zA-Z0-9.\-_]/g, "_");
         const path = `${id}/${Date.now()}-${safeName}`;
         const bytes = Buffer.from(await value.arrayBuffer());
+        const classified = classifyUploadedDocument(value, bytes);
 
         const { error } = await supabase.storage.from("case-files").upload(path, bytes, {
           contentType: value.type || "application/octet-stream",
@@ -136,10 +173,31 @@ export async function POST(request: Request) {
 
         if (!error) {
           uploadedEntries.push(`storage://${path}`);
+          uploadedEntries.push(classified.label);
+          documentRows.push(buildCaseDocumentRecord({
+            caseId: id,
+            path,
+            file: value,
+            classification: classified,
+            context,
+          }));
+          if (classified.extraction.status === "extracted" && classified.extraction.text) {
+            extractedReportTexts.push(classified.extraction.text);
+          }
         } else {
           return NextResponse.json({ error: `Could not securely upload ${value.name}.`, details: error.message }, { status: 500 });
         }
       }
+    }
+
+    if (!payload.reportText && extractedReportTexts.length > 0) {
+      const extractedFromFiles = extractCaseInfo(extractedReportTexts.join("\n\n"));
+      extractedSymptoms = uniqueValues([...payload.symptoms, ...extractedFromFiles.symptoms]);
+      extractedImaging = uniqueValues([...payload.imaging, ...extractedFromFiles.imaging]);
+      extractedSurgeries = payload.surgeries.length ? payload.surgeries : extractedFromFiles.surgeries;
+      extractedUncertaintyFlags = uniqueValues([...payload.uncertaintyFlags, ...extractedFromFiles.uncertaintyFlags]);
+      extractedMissingInfo = uniqueValues([...payload.missingInfo, ...extractedFromFiles.missingInfo]);
+      extractedDiseaseMap = extractedFromFiles.diseaseMap;
     }
 
     const insertPayload = buildCaseInsertPayload({
@@ -147,12 +205,12 @@ export async function POST(request: Request) {
       title: payload.title,
       age: payload.age,
       country: payload.country,
-      symptoms: payload.symptoms,
-      imaging: [...payload.imaging, ...uploadedEntries],
-      surgeries: payload.surgeries,
-      diseaseMap: payload.diseaseMap,
-      uncertaintyFlags: payload.uncertaintyFlags.length > 0 ? payload.uncertaintyFlags : ["Initial automated structuring pending specialist validation."],
-      missingInfo: payload.missingInfo.length > 0 ? payload.missingInfo : ["Operative notes", "Pathology report", "MRI protocol details"],
+      symptoms: extractedSymptoms,
+      imaging: [...extractedImaging, ...uploadedEntries],
+      surgeries: extractedSurgeries,
+      diseaseMap: extractedDiseaseMap,
+      uncertaintyFlags: extractedUncertaintyFlags.length > 0 ? extractedUncertaintyFlags : ["Initial automated structuring pending specialist validation."],
+      missingInfo: extractedMissingInfo.length > 0 ? extractedMissingInfo : ["Operative notes", "Pathology report", "MRI protocol details"],
       severity,
       complexityNote: payload.sourceLabel ? `Submitted from ${payload.sourceLabel}.` : "Newly submitted case awaiting specialist review.",
       status: payload.sourceLabel === "clinic batch import" ? "imported" : "submitted",
@@ -175,6 +233,17 @@ export async function POST(request: Request) {
         },
         { status: 500 },
       );
+    }
+
+    if (documentRows.length > 0) {
+      const { error: documentError } = await supabase.from("case_documents").insert(documentRows);
+      if (documentError && !isMissingDocumentTableError(documentError)) {
+        return NextResponse.json({
+          error: "Case was saved, but document OCR tracking could not be initialized.",
+          details: documentError.message,
+          id,
+        }, { status: 500 });
+      }
     }
 
     return NextResponse.json({ id, severity });

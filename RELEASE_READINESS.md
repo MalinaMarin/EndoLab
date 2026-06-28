@@ -49,6 +49,17 @@ These cannot be completed inside the repository:
 - production email delivery, MFA enforcement, and enterprise SSO configuration
 - a live FHIR/HL7 integration; the current EMR connector is demonstrative
 
+## Lawful AI boundary
+
+EndoLab should introduce intelligence in this order:
+
+1. Explainable, deterministic assistance: confidence, evidence links, record-gap detection, specialist-fit rationale, and human-review triggers.
+2. Human-reviewed extraction: every structured clinical field must be traceable to source text or reviewer correction.
+3. Contracted AI vendors only when a data-processing agreement, regional hosting, retention policy, and audit logging are in place.
+4. Validated clinical claims only after clinician-designed validation and regulatory assessment.
+
+Do not launch features that diagnose endometriosis, detect disease directly from MRI images, choose treatment, autonomously prioritize care, or guarantee surgeon quality unless the intended use, evidence, contracts, and regulatory pathway explicitly support those claims.
+
 ## Pilot-ready definition
 
 - contracted clinic or closed cohort

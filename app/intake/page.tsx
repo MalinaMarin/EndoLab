@@ -3,13 +3,22 @@ import { ClipboardPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { IntakeForm } from "@/components/clinical/intake-form";
 import { requireUser } from "@/lib/account";
+import { listCases } from "@/lib/cases-store";
+import { ActiveCaseGate } from "@/components/patient/active-case-gate";
 
 export default async function IntakePage() {
   const context = await requireUser();
+  const activeCase = context.accountType === "patient"
+    ? (await listCases(context)).find((item) => !item.archivedAt)
+    : undefined;
   const paymentEnabled = Boolean(
-    process.env.STRIPE_SECRET_KEY &&
-    process.env.STRIPE_PRICE_ID &&
-    process.env.STRIPE_WEBHOOK_SECRET,
+    (
+      process.env.STRIPE_SECRET_KEY &&
+      process.env.STRIPE_PRICE_ID &&
+      process.env.STRIPE_WEBHOOK_SECRET
+    ) ||
+    process.env.ENABLE_SANDBOX_CHECKOUT === "true" ||
+    process.env.NODE_ENV !== "production",
   );
 
   return (
@@ -26,7 +35,7 @@ export default async function IntakePage() {
           </p>
         </header>
 
-        <IntakeForm paymentEnabled={paymentEnabled} accountType={context.accountType} />
+        {activeCase ? <ActiveCaseGate item={activeCase} /> : <IntakeForm paymentEnabled={paymentEnabled} accountType={context.accountType} />}
 
         <div className="mt-6 flex flex-wrap gap-3">
           <Button asChild variant="outline" size="lg">

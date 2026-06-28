@@ -48,10 +48,11 @@ export type EndoCase = {
   missingInfo: string[];
   severity: CaseSeverity;
   complexityNote: string;
-  status?: "submitted" | "imported" | "reviewed";
+  status?: "submitted" | "imported" | "reviewed" | "archived";
   paymentStatus?: "not_required" | "unpaid" | "pending" | "paid" | "refunded";
   ownerUserId?: string;
   organizationId?: string;
   assignedTo?: string;
   createdAt?: string;
+  archivedAt?: string;
 };

@@ -12,6 +12,10 @@ const PAGE_SIZE: [number, number] = [595.28, 841.89];
 const PAGE_MARGIN = 50;
 const FONT_SIZE = 11;
 const LINE_GAP = 16;
+const VIOLET = rgb(0.29, 0.12, 0.72);
+const TEAL = rgb(0, 0.48, 0.45);
+const SLATE = rgb(0.1, 0.14, 0.22);
+const MUTED = rgb(0.39, 0.45, 0.55);
 
 function wrapText(text: string, font: PDFFont, size: number, maxWidth: number) {
   const lines: string[] = [];
@@ -67,64 +71,127 @@ export async function GET(_request: Request, { params }: RouteProps) {
   const left = PAGE_MARGIN;
   const maxWidth = PAGE_SIZE[0] - PAGE_MARGIN * 2;
 
-  const drawLines = (lines: string[], useBold = false) => {
+  const newPage = () => {
+    page = pdfDoc.addPage(PAGE_SIZE);
+    y = PAGE_SIZE[1] - PAGE_MARGIN;
+  };
+
+  const ensureSpace = (height: number) => {
+    if (y - height < PAGE_MARGIN) newPage();
+  };
+
+  const drawText = (text: string, options?: { x?: number; size?: number; useBold?: boolean; color?: ReturnType<typeof rgb> }) => {
+    const size = options?.size ?? FONT_SIZE;
+    ensureSpace(size + 4);
+    page.drawText(text, {
+      x: options?.x ?? left,
+      y,
+      size,
+      font: options?.useBold ? bold : font,
+      color: options?.color ?? SLATE,
+    });
+    y -= size + 5;
+  };
+
+  const drawLines = (lines: string[], useBold = false, color = SLATE) => {
     for (const line of lines) {
-      if (y < PAGE_MARGIN + LINE_GAP) {
-        page = pdfDoc.addPage(PAGE_SIZE);
-        y = PAGE_SIZE[1] - PAGE_MARGIN;
-      }
+      ensureSpace(LINE_GAP);
 
       page.drawText(line, {
         x: left,
         y,
         size: FONT_SIZE,
         font: useBold ? bold : font,
-        color: rgb(0.1, 0.1, 0.1),
+        color,
       });
 
       y -= LINE_GAP;
     }
   };
 
-  drawLines(wrapText("EndoLab Case Summary", bold, FONT_SIZE, maxWidth), true);
-  drawLines(wrapText(`Case ID: ${item.id}`, font, FONT_SIZE, maxWidth));
-  drawLines(wrapText(`Title: ${item.title}`, font, FONT_SIZE, maxWidth));
-  drawLines(wrapText(`Severity: ${item.severity}`, font, FONT_SIZE, maxWidth));
-  y -= LINE_GAP;
+  const drawSection = (title: string, content: string[]) => {
+    ensureSpace(60);
+    y -= 8;
+    page.drawRectangle({
+      x: left,
+      y: y - 24,
+      width: maxWidth,
+      height: 28,
+      color: rgb(0.96, 0.95, 1),
+      borderColor: rgb(0.83, 0.78, 0.98),
+      borderWidth: 0.8,
+    });
+    page.drawText(title.toUpperCase(), { x: left + 12, y: y - 14, size: 10, font: bold, color: VIOLET });
+    y -= 40;
+    const safeContent = content.length ? content : ["No entries recorded."];
+    safeContent.forEach((entry) => drawLines(wrapText(`- ${entry}`, font, FONT_SIZE, maxWidth - 10), false));
+  };
 
-  drawLines(wrapText("Clinical Summary", bold, FONT_SIZE, maxWidth), true);
-  drawLines(wrapText(item.summary, font, FONT_SIZE, maxWidth));
-  y -= LINE_GAP;
+  const readiness = item.paymentStatus === "paid" || item.paymentStatus === "not_required" ? "Eligible for specialist referral" : "Payment or clinic eligibility pending";
 
-  drawLines(wrapText("Symptoms", bold, FONT_SIZE, maxWidth), true);
-  item.symptoms.forEach((symptom) => drawLines(wrapText(`- ${symptom}`, font, FONT_SIZE, maxWidth)));
-  y -= LINE_GAP;
+  page.drawRectangle({ x: 0, y: PAGE_SIZE[1] - 120, width: PAGE_SIZE[0], height: 120, color: rgb(0.98, 0.97, 1) });
+  page.drawText("EndoLab", { x: left, y: PAGE_SIZE[1] - 58, size: 24, font: bold, color: VIOLET });
+  page.drawText("Referral-ready endometriosis case packet", { x: left, y: PAGE_SIZE[1] - 80, size: 12, font, color: MUTED });
+  page.drawText(new Date().toISOString().slice(0, 10), { x: PAGE_SIZE[0] - PAGE_MARGIN - 72, y: PAGE_SIZE[1] - 58, size: 11, font: bold, color: TEAL });
+  y = PAGE_SIZE[1] - 145;
 
-  drawLines(wrapText("Timeline", bold, FONT_SIZE, maxWidth), true);
-  item.timeline.forEach((entry) => drawLines(wrapText(`- ${entry.date}: ${entry.label} (${entry.type})`, font, FONT_SIZE, maxWidth)));
-  y -= LINE_GAP;
+  drawLines(wrapText(item.title, bold, 18, maxWidth), true, SLATE);
+  drawText(`Case ID: ${item.id}`, { size: 10, color: MUTED });
+  drawText(`Patient: ${item.patient.age ? `${item.patient.age} years` : "age not recorded"}${item.patient.country ? `, ${item.patient.country}` : ""}`, { size: 10, color: MUTED });
+  drawText(`Severity: ${item.severity} | Referral state: ${readiness}`, { size: 10, color: TEAL, useBold: true });
 
-  drawLines(wrapText("Uncertainty Flags", bold, FONT_SIZE, maxWidth), true);
-  item.uncertaintyFlags.forEach((flag) => drawLines(wrapText(`- ${flag}`, font, FONT_SIZE, maxWidth)));
-  y -= LINE_GAP;
+  y -= 8;
+  page.drawRectangle({
+    x: left,
+    y: y - 72,
+    width: maxWidth,
+    height: 78,
+    color: rgb(0.94, 0.99, 0.98),
+    borderColor: rgb(0.67, 0.92, 0.88),
+    borderWidth: 0.8,
+  });
+  page.drawText("CLINICAL SNAPSHOT", { x: left + 14, y: y - 18, size: 10, font: bold, color: TEAL });
+  const snapshot = wrapText(item.summary, font, 11, maxWidth - 28).slice(0, 3);
+  snapshot.forEach((line, index) => page.drawText(line, { x: left + 14, y: y - 38 - index * 15, size: 11, font, color: SLATE }));
+  y -= 92;
 
-  drawLines(wrapText("Missing Information", bold, FONT_SIZE, maxWidth), true);
-  item.missingInfo.forEach((entry) => drawLines(wrapText(`- ${entry}`, font, FONT_SIZE, maxWidth)));
-  y -= LINE_GAP;
+  drawSection("Symptoms", item.symptoms);
+  drawSection("Disease map", [
+    `Ovaries: ${item.diseaseMap.ovaries.replace("_", " ")}`,
+    `Bowel: ${item.diseaseMap.bowel.replace("_", " ")}`,
+    `Bladder: ${item.diseaseMap.bladder.replace("_", " ")}`,
+    `Uterosacral: ${item.diseaseMap.uterosacral.replace("_", " ")}`,
+    `Adhesions: ${item.diseaseMap.adhesions}`,
+  ]);
+  drawSection("Surgical history", item.surgeries.map((surgery) => `${surgery.year || "Date unknown"} - ${surgery.type}; completeness: ${surgery.completeness}; ${surgery.notes}`));
+  drawSection("Imaging and documents", item.imaging);
+  drawSection("Timeline", item.timeline.map((entry) => `${entry.date}: ${entry.label} (${entry.type})`));
+  drawSection("Missing records", item.missingInfo);
+  drawSection("Clinical uncertainty", item.uncertaintyFlags);
+  drawSection("Referral guidance", referralGuidance);
+  drawSection("Suggested surgeon expertise", expertiseTags);
 
-  drawLines(wrapText("Referral Guidance", bold, FONT_SIZE, maxWidth), true);
-  referralGuidance.forEach((entry) => drawLines(wrapText(`- ${entry}`, font, FONT_SIZE, maxWidth)));
-  y -= LINE_GAP;
-
-  drawLines(wrapText("Surgeon Expertise Tags", bold, FONT_SIZE, maxWidth), true);
-  drawLines(wrapText(expertiseTags.join(", "), font, FONT_SIZE, maxWidth));
+  ensureSpace(44);
+  y -= 12;
+  page.drawLine({ start: { x: left, y }, end: { x: left + maxWidth, y }, thickness: 0.8, color: rgb(0.86, 0.88, 0.92) });
+  y -= 18;
+  drawLines(
+    wrapText(
+      "This packet organizes patient-provided and clinic-provided records for clinician review. It is not a diagnosis, emergency service, or replacement for professional medical judgment.",
+      font,
+      9,
+      maxWidth,
+    ),
+    false,
+    MUTED,
+  );
 
   const bytes = await pdfDoc.save();
 
   return new NextResponse(Buffer.from(bytes), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="endolab-${item.id}.pdf"`,
+      "Content-Disposition": `attachment; filename="endolab-clinical-packet-${item.id}.pdf"`,
     },
   });
 }

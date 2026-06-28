@@ -10,6 +10,7 @@ import EditableDiseaseMap from "@/components/clinical/editable-disease-map";
 import SurgeriesEditor from "@/components/clinical/surgeries-editor";
 import type { EndoCase } from "@/lib/types";
 import { generateCaseSummary } from "@/lib/case-utils";
+import type { DocumentProfile, ExtractionEvidence } from "@/lib/document-extraction";
 
 type ExtractedCaseStructure = {
   symptoms: string[];
@@ -67,6 +68,10 @@ export function IntakeForm({ paymentEnabled, accountType }: { paymentEnabled: bo
   });
   const [documents, setDocuments] = useState<File[]>([]);
   const [latestExtracted, setLatestExtracted] = useState<ExtractedCaseStructure | null>(null);
+  const [latestEvidence, setLatestEvidence] = useState<ExtractionEvidence[]>([]);
+  const [latestDocumentProfile, setLatestDocumentProfile] = useState<DocumentProfile | null>(null);
+  const [latestConfidenceScore, setLatestConfidenceScore] = useState<number | null>(null);
+  const [humanConfirmationRequired, setHumanConfirmationRequired] = useState(false);
   const [editingStructure, setEditingStructure] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [isExtracting, setIsExtracting] = useState(false);
@@ -128,10 +133,21 @@ export function IntakeForm({ paymentEnabled, accountType }: { paymentEnabled: bo
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: sourceText }),
       });
-      const payload = await response.json();
+      const payload = await response.json() as {
+        extracted?: ExtractedCaseStructure;
+        evidence?: ExtractionEvidence[];
+        documentProfile?: DocumentProfile;
+        confidenceScore?: number;
+        humanConfirmationRequired?: boolean;
+        error?: string;
+      };
       if (!response.ok || !payload.extracted) throw new Error(payload.error ?? "Extraction failed.");
-      const extracted = payload.extracted as ExtractedCaseStructure;
+      const extracted = payload.extracted;
       setLatestExtracted(extracted);
+      setLatestEvidence(payload.evidence ?? []);
+      setLatestDocumentProfile(payload.documentProfile ?? null);
+      setLatestConfidenceScore(payload.confidenceScore ?? null);
+      setHumanConfirmationRequired(Boolean(payload.humanConfirmationRequired));
       setDraft((current) => ({
         ...current,
         structuredSymptoms: extracted.symptoms.length ? extracted.symptoms : current.structuredSymptoms,
@@ -141,7 +157,7 @@ export function IntakeForm({ paymentEnabled, accountType }: { paymentEnabled: bo
         missingInfo: extracted.missingInfo,
       }));
       setStep(3);
-      toast.show({ title: "Findings structured", message: "Review the suggested disease map and record gaps.", type: "success" });
+      toast.show({ title: "Findings structured", message: "Review the source evidence before confirming this case.", type: "success" });
     } catch (error) {
       toast.show({ title: "Extraction failed", message: error instanceof Error ? error.message : "Extraction failed.", type: "error" });
     } finally {
@@ -294,6 +310,10 @@ export function IntakeForm({ paymentEnabled, accountType }: { paymentEnabled: bo
               {latestExtracted ? (
                 <ExtractReview
                   extracted={latestExtracted}
+                  evidence={latestEvidence}
+                  documentProfile={latestDocumentProfile}
+                  confidenceScore={latestConfidenceScore}
+                  humanConfirmationRequired={humanConfirmationRequired}
                   reportText={[draft.symptoms, draft.reportText].filter(Boolean).join("\n\n")}
                   onSave={(corrected) => setDraft((current) => ({
                     ...current,

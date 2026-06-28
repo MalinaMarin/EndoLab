@@ -25,6 +25,7 @@ export async function GET() {
       configuration: {
         requiredReady: healthy,
         paymentsReady: !missingOptional.some((name) => name.startsWith("STRIPE_")),
+        sandboxCheckoutReady: process.env.ENABLE_SANDBOX_CHECKOUT === "true" || process.env.NODE_ENV !== "production",
         adminReady: !missingOptional.includes("ADMIN_REVIEWER_SECRET"),
       },
     },

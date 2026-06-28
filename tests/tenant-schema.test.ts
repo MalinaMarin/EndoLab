@@ -31,3 +31,23 @@ test("clinic cases support organization-scoped assignment", () => {
   assert.match(schema, /cases_update_owner_or_org/);
   assert.match(schema, /for update using \(owner_user_id = auth\.uid\(\) or public\.is_org_member\(organization_id\)\)/);
 });
+
+test("patient cases support archived clinical journeys", () => {
+  assert.match(schema, /status text not null default 'submitted'/);
+  assert.match(schema, /cases_owner_user_id_idx/);
+});
+
+test("case messages are scoped through case access policies", () => {
+  assert.match(schema, /create table if not exists public\.case_messages/);
+  assert.match(schema, /case_messages_access_by_case/);
+  assert.match(schema, /where c\.id = case_messages\.case_id/);
+  assert.match(schema, /c\.owner_user_id = auth\.uid\(\) or public\.is_org_member\(c\.organization_id\)/);
+});
+
+test("case documents track OCR status inside case access policies", () => {
+  assert.match(schema, /create table if not exists public\.case_documents/);
+  assert.match(schema, /ocr_status text not null default 'not_required'/);
+  assert.match(schema, /case_documents_access_by_case/);
+  assert.match(schema, /where c\.id = case_documents\.case_id/);
+  assert.match(schema, /public\.case_documents/);
+});

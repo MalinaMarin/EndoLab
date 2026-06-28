@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ShieldCheck, UploadCloud, UsersRound } from "lucide-react";
+import { BarChart3, ShieldCheck, UploadCloud, UsersRound } from "lucide-react";
 import { CaseQueue } from "@/components/clinic/case-queue";
 import { Button } from "@/components/ui/button";
 import { listCases } from "@/lib/cases-store";
@@ -43,6 +43,9 @@ export default async function ClinicDashboardPage() {
               </Button>
               <Button asChild variant="outline" size="lg">
                 <Link href="/doctor/inbox">Doctor inbox</Link>
+              </Button>
+              <Button asChild variant="outline" size="lg">
+                <Link href="/clinic/analytics"><BarChart3 className="h-4 w-4" /> Analytics</Link>
               </Button>
               <Button asChild variant="outline" size="lg">
                 <Link href="/clinic/team"><UsersRound className="h-4 w-4" /> Team</Link>

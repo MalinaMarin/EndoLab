@@ -22,6 +22,8 @@ function requireFile(relativePath) {
   "app/signup/page.tsx",
   "app/patient/dashboard/page.tsx",
   "app/clinic/team/page.tsx",
+  "components/clinical/case-intelligence-panel.tsx",
+  "lib/intelligence.ts",
   "supabase/schema.sql",
   ".env.example",
 ].forEach(requireFile);
@@ -60,6 +62,10 @@ const envExample = read(".env.example");
 for (const variable of ["NEXT_PUBLIC_SUPABASE_ANON_KEY", "STRIPE_WEBHOOK_SECRET", "ADMIN_REVIEWER_SECRET"]) {
   if (!envExample.includes(`${variable}=`)) failures.push(`.env.example is missing ${variable}`);
 }
+
+const intelligence = read("lib/intelligence.ts");
+if (!intelligence.includes("Do not diagnose")) failures.push("intelligence module is missing diagnostic-use prohibition");
+if (!intelligence.includes("humanReviewRequired")) failures.push("intelligence module is missing human-review gate");
 
 if (!process.env.STRIPE_SECRET_KEY) warnings.push("Stripe is not configured in this shell");
 
